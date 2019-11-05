@@ -82,6 +82,9 @@ struct gadget_info {
 	bool sw_connected;
 	struct work_struct work;
 	struct device *dev;
+#ifdef CONFIG_USB_CONFIGFS_WAKELOCK
+	struct wakeup_source *usb_ws;
+#endif
 #endif
 };
 
@@ -1468,6 +1471,9 @@ static void android_work(struct work_struct *data)
 	spin_unlock_irqrestore(&cdev->lock, flags);
 
 	if (status[0]) {
+#ifdef CONFIG_USB_CONFIGFS_WAKELOCK
+		__pm_stay_awake(gi->usb_ws);
+#endif
 		kobject_uevent_env(&gi->dev->kobj, KOBJ_CHANGE, connected);
 		pr_info("%s: sent uevent %s\n", __func__, connected[0]);
 		uevent_sent = true;
@@ -1483,6 +1489,9 @@ static void android_work(struct work_struct *data)
 		kobject_uevent_env(&gi->dev->kobj, KOBJ_CHANGE, disconnected);
 		pr_info("%s: sent uevent %s\n", __func__, disconnected[0]);
 		uevent_sent = true;
+#ifdef CONFIG_USB_CONFIGFS_WAKELOCK
+		__pm_relax(gi->usb_ws);
+#endif
 	}
 
 	if (!uevent_sent) {
@@ -1747,6 +1756,9 @@ static int android_device_create(struct gadget_info *gi)
 	struct device_attribute **attrs;
 	struct device_attribute *attr;
 
+#ifdef CONFIG_USB_CONFIGFS_WAKELOCK
+	gi->usb_ws = wakeup_source_register(gi->dev, "android_usb");
+#endif
 	INIT_WORK(&gi->work, android_work);
 	gi->dev = device_create(android_class, NULL,
 			MKDEV(0, 0), NULL, "android%d", gadget_index++);
@@ -1772,8 +1784,9 @@ static int android_device_create(struct gadget_info *gi)
 	return 0;
 }
 
-static void android_device_destroy(struct gadget_info *gi)
+static void android_device_destroy(struct config_item *item)
 {
+	struct gadget_info *gi = to_gadget_info(item);
 	struct device_attribute **attrs;
 	struct device_attribute *attr;
 
@@ -1781,6 +1794,9 @@ static void android_device_destroy(struct gadget_info *gi)
 	while ((attr = *attrs++))
 		device_remove_file(gi->dev, attr);
 	device_destroy(gi->dev->class, gi->dev->devt);
+#ifdef CONFIG_USB_CONFIGFS_WAKELOCK
+	wakeup_source_unregister(gi->usb_ws);
+#endif
 }
 #else
 static inline int android_device_create(struct gadget_info *gi)
@@ -1788,7 +1804,7 @@ static inline int android_device_create(struct gadget_info *gi)
 	return 0;
 }
 
-static inline void android_device_destroy(struct gadget_info *gi)
+static inline void android_device_destroy(struct config_item *item)
 {
 }
 #endif
@@ -1861,7 +1877,7 @@ static void gadgets_drop(struct config_group *group, struct config_item *item)
 
 	gi = container_of(to_config_group(item), struct gadget_info, group);
 	config_item_put(item);
-	android_device_destroy(gi);
+	android_device_destroy(item);
 }
 
 static struct configfs_group_operations gadgets_ops = {
