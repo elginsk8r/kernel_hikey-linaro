@@ -58,8 +58,8 @@ DECLARE_RESTRICTED_HOOK(android_rvh_rtmutex_prepare_setprio,
 	TP_ARGS(p, pi_task), 1);
 
 DECLARE_RESTRICTED_HOOK(android_rvh_set_user_nice,
-	TP_PROTO(struct task_struct *p, long *nice),
-	TP_ARGS(p, nice), 1);
+	TP_PROTO(struct task_struct *p, long *nice, bool *allowed),
+	TP_ARGS(p, nice, allowed), 1);
 
 DECLARE_RESTRICTED_HOOK(android_rvh_setscheduler,
 	TP_PROTO(struct task_struct *p),
@@ -112,17 +112,25 @@ DECLARE_RESTRICTED_HOOK(android_rvh_resume_cpus,
 DECLARE_RESTRICTED_HOOK(android_rvh_find_energy_efficient_cpu,
 	TP_PROTO(struct task_struct *p, int prev_cpu, int sync, int *new_cpu),
 	TP_ARGS(p, prev_cpu, sync, new_cpu), 1);
+
 struct sched_attr;
 DECLARE_HOOK(android_vh_set_sugov_sched_attr,
 	TP_PROTO(struct sched_attr *attr),
 	TP_ARGS(attr));
+
 DECLARE_RESTRICTED_HOOK(android_rvh_set_iowait,
 	TP_PROTO(struct task_struct *p, int *should_iowait_boost),
 	TP_ARGS(p, should_iowait_boost), 1);
+
 struct sugov_policy;
 DECLARE_RESTRICTED_HOOK(android_rvh_set_sugov_update,
 	TP_PROTO(struct sugov_policy *sg_policy, unsigned int next_freq, bool *should_update),
 	TP_ARGS(sg_policy, next_freq, should_update), 1);
+
+DECLARE_RESTRICTED_HOOK(android_rvh_cpu_overutilized,
+	TP_PROTO(int cpu, int *overutilized),
+	TP_ARGS(cpu, overutilized), 1);
+
 DECLARE_RESTRICTED_HOOK(android_rvh_sched_setaffinity,
 	TP_PROTO(struct task_struct *p, const struct cpumask *in_mask, int *retval),
 	TP_ARGS(p, in_mask, retval), 1);
@@ -251,6 +259,21 @@ DECLARE_RESTRICTED_HOOK(android_rvh_pick_next_entity,
 DECLARE_RESTRICTED_HOOK(android_rvh_check_preempt_wakeup,
 	TP_PROTO(struct rq *rq, struct task_struct *p, bool *preempt),
 	TP_ARGS(rq, p, preempt), 1);
+
+DECLARE_HOOK(android_vh_do_wake_up_sync,
+	TP_PROTO(struct wait_queue_head *wq_head, int *done),
+	TP_ARGS(wq_head, done));
+
+DECLARE_HOOK(android_vh_set_wake_flags,
+	TP_PROTO(int *wake_flags, unsigned int *mode),
+	TP_ARGS(wake_flags, mode));
+
+enum uclamp_id;
+struct uclamp_se;
+DECLARE_RESTRICTED_HOOK(android_rvh_uclamp_eff_value,
+	TP_PROTO(struct task_struct *p, enum uclamp_id clamp_id,
+		 struct uclamp_se *uclamp_default, unsigned long *ret),
+	TP_ARGS(p, clamp_id, uclamp_default, ret), 1);
 
 /* macro versions of hooks are no longer required */
 
