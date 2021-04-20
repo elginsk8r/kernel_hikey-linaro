@@ -824,6 +824,8 @@ void post_init_entity_util_avg(struct task_struct *p)
 		return;
 	}
 
+	/* Hook before this se's util is attached to cfs_rq's util */
+	trace_android_rvh_post_init_entity_util_avg(se);
 	attach_entity_cfs_rq(se);
 }
 
@@ -7027,7 +7029,7 @@ static void check_preempt_wakeup(struct rq *rq, struct task_struct *p, int wake_
 	struct cfs_rq *cfs_rq = task_cfs_rq(curr);
 	int scale = cfs_rq->nr_running >= sched_nr_latency;
 	int next_buddy_marked = 0;
-	bool preempt = false;
+	bool preempt = false, nopreempt = false;
 	bool ignore = false;
 
 	if (unlikely(se == pse))
@@ -7075,11 +7077,13 @@ static void check_preempt_wakeup(struct rq *rq, struct task_struct *p, int wake_
 	if (unlikely(p->policy != SCHED_NORMAL) || !sched_feat(WAKEUP_PREEMPTION))
 		return;
 
-	trace_android_rvh_check_preempt_wakeup(rq, p, &preempt);
-	if (preempt)
-		goto preempt;
 	find_matching_se(&se, &pse);
 	update_curr(cfs_rq_of(se));
+	trace_android_rvh_check_preempt_wakeup(rq, p, &preempt, &nopreempt);
+	if (preempt)
+		goto preempt;
+	if (nopreempt)
+		return;
 	BUG_ON(!pse);
 	if (wakeup_preempt_entity(se, pse) == 1) {
 		/*
@@ -7115,8 +7119,8 @@ struct task_struct *
 pick_next_task_fair(struct rq *rq, struct task_struct *prev, struct rq_flags *rf)
 {
 	struct cfs_rq *cfs_rq = &rq->cfs;
-	struct sched_entity *se;
-	struct task_struct *p;
+	struct sched_entity *se = NULL;
+	struct task_struct *p = NULL;
 	int new_tasks;
 	bool repick = false;
 
@@ -7207,8 +7211,11 @@ simple:
 		put_prev_task(rq, prev);
 
 	trace_android_rvh_replace_next_task_fair(rq, &p, &se, &repick, true);
-	if (repick)
+	if (repick) {
+		for_each_sched_entity(se)
+			set_next_entity(cfs_rq_of(se), se);
 		goto done;
+	}
 
 	do {
 		se = pick_next_entity(cfs_rq, NULL);
