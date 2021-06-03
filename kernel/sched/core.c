@@ -45,6 +45,11 @@ EXPORT_TRACEPOINT_SYMBOL_GPL(sched_util_est_cfs_tp);
 EXPORT_TRACEPOINT_SYMBOL_GPL(sched_util_est_se_tp);
 EXPORT_TRACEPOINT_SYMBOL_GPL(sched_update_nr_running_tp);
 EXPORT_TRACEPOINT_SYMBOL_GPL(sched_switch);
+#ifdef CONFIG_SCHEDSTATS
+EXPORT_TRACEPOINT_SYMBOL_GPL(sched_stat_wait);
+EXPORT_TRACEPOINT_SYMBOL_GPL(sched_stat_iowait);
+EXPORT_TRACEPOINT_SYMBOL_GPL(sched_stat_blocked);
+#endif
 
 DEFINE_PER_CPU_SHARED_ALIGNED(struct rq, runqueues);
 EXPORT_SYMBOL_GPL(runqueues);
@@ -2091,7 +2096,15 @@ void force_compatible_cpus_allowed_ptr(struct task_struct *p)
 	cpumask_var_t new_mask;
 	const struct cpumask *override_mask = task_cpu_possible_mask(p);
 
-	if (!alloc_cpumask_var(&new_mask, GFP_KERNEL))
+	alloc_cpumask_var(&new_mask, GFP_KERNEL);
+
+	/*
+	 * __migrate_task() can fail silently in the face of concurrent
+	 * offlining of the chosen destination CPU, so take the hotplug
+	 * lock to ensure that the migration succeeds.
+	 */
+	cpus_read_lock();
+	if (!cpumask_available(new_mask))
 		goto out_set_mask;
 
 	if (!restrict_cpus_allowed_ptr(p, new_mask, override_mask))
@@ -2111,8 +2124,9 @@ out_set_mask:
 				cpumask_pr_args(override_mask));
 	}
 
-	set_cpus_allowed_ptr(p, override_mask);
+	WARN_ON(set_cpus_allowed_ptr(p, override_mask));
 out_free_mask:
+	cpus_read_unlock();
 	free_cpumask_var(new_mask);
 }
 
@@ -3039,6 +3053,19 @@ try_to_wake_up(struct task_struct *p, unsigned int state, int wake_flags)
 	smp_mb__after_spinlock();
 	if (!(p->state & state))
 		goto unlock;
+
+#ifdef CONFIG_FREEZER
+	/*
+	 * If we're going to wake up a thread which may be frozen, then
+	 * we can only do so if we have an active CPU which is capable of
+	 * running it. This may not be the case when resuming from suspend,
+	 * as the secondary CPUs may not yet be back online. See __thaw_task()
+	 * for the actual wakeup.
+	 */
+	if (unlikely(frozen_or_skipped(p)) &&
+	    !cpumask_intersects(cpu_active_mask, task_cpu_possible_mask(p)))
+		goto unlock;
+#endif
 
 	trace_sched_waking(p);
 
