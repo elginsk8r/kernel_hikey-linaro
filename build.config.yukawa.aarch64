@@ -23,6 +23,8 @@ arch/arm64/boot/dts/amlogic/meson-g12b-a311d-khadas-vim3.dtb
 arch/arm64/boot/dts/amlogic/meson-g12b-a311d-khadas-vim3-android.dtb
 arch/arm64/boot/dts/amlogic/meson-sm1-khadas-vim3l.dtb
 arch/arm64/boot/dts/amlogic/meson-sm1-khadas-vim3l-android.dtb
+arch/arm64/boot/dts/amlogic/meson-g12b-odroid-n2.dtb
+arch/arm64/boot/dts/amlogic/meson-g12b-odroid-n2-android.dtb
 arch/arm64/boot/Image.lz4
 "
 
