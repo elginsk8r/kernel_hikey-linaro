@@ -32,7 +32,9 @@ dtb-$(CONFIG_ARCH_MESON) += meson-g12b-gtking.dtb
 dtb-$(CONFIG_ARCH_MESON) += meson-g12b-a311d-libretech-cc.dtb
 dtb-$(CONFIG_ARCH_MESON) += meson-g12b-odroid-go-ultra.dtb
 dtb-$(CONFIG_ARCH_MESON) += meson-g12b-odroid-n2-plus.dtb
+dtb-$(CONFIG_ARCH_MESON) += meson-g12b-odroid-n2-plus-android.dtb
 dtb-$(CONFIG_ARCH_MESON) += meson-g12b-odroid-n2.dtb
+dtb-$(CONFIG_ARCH_MESON) += meson-g12b-odroid-n2-android.dtb
 dtb-$(CONFIG_ARCH_MESON) += meson-g12b-odroid-n2l.dtb
 dtb-$(CONFIG_ARCH_MESON) += meson-g12b-radxa-zero2.dtb
 dtb-$(CONFIG_ARCH_MESON) += meson-g12b-s922x-bananapi-m2s.dtb
@@ -100,6 +102,8 @@ dtb-$(CONFIG_ARCH_MESON) += meson-sm1-x96-air.dtb
 # Android Overlays
 meson-g12a-sei510-android-dtbs	:= meson-g12a-sei510.dtb meson-sei510-android.dtbo
 meson-g12b-a311d-khadas-vim3-android-dtbs	:= meson-g12b-a311d-khadas-vim3.dtb meson-khadas-vim3-android.dtbo
+meson-g12b-odroid-n2-plus-android-dtbs	:= meson-g12b-odroid-n2-plus.dtb meson-odroid-n2-plus-android.dtbo
+meson-g12b-odroid-n2-android-dtbs	:= meson-g12b-odroid-n2.dtb meson-odroid-n2-android.dtbo
 meson-sm1-khadas-vim3l-android-dtbs	:= meson-sm1-khadas-vim3l.dtb meson-khadas-vim3l-android.dtbo
 meson-sm1-sei610-android-dtbs	:= meson-sm1-sei610.dtb  meson-sei610-android.dtbo
 
