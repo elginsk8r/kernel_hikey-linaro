@@ -422,6 +422,7 @@
   dev_queue_xmit
   devres_add
   devres_alloc_node
+  devres_free
   dev_set_name
   _dev_warn
   disable_irq
@@ -1804,6 +1805,7 @@
   __traceiter_android_vh_of_i2c_get_board_info
   __traceiter_android_vh_setscheduler_uclamp
   __traceiter_android_vh_snd_compr_use_pause_in_drain
+  __traceiter_android_vh_sysrq_crash
   __traceiter_android_vh_thermal_pm_notify_suspend
   __traceiter_android_vh_timerfd_create
   __traceiter_android_vh_typec_store_partner_src_caps
@@ -1868,6 +1870,7 @@
   __tracepoint_android_vh_of_i2c_get_board_info
   __tracepoint_android_vh_setscheduler_uclamp
   __tracepoint_android_vh_snd_compr_use_pause_in_drain
+  __tracepoint_android_vh_sysrq_crash
   __tracepoint_android_vh_thermal_pm_notify_suspend
   __tracepoint_android_vh_timerfd_create
   __tracepoint_android_vh_typec_store_partner_src_caps
