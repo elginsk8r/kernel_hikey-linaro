@@ -178,7 +178,7 @@ static int finalize_host_mappings_walker(u64 addr, u64 end, u32 level,
 
 	phys = kvm_pte_to_phys(pte);
 	if (!addr_is_memory(phys))
-		return 0;
+		return -EINVAL;
 
 	/*
 	 * Adjust the host stage-2 mappings to match the ownership attributes
@@ -207,8 +207,18 @@ static int finalize_host_mappings(void)
 		.cb	= finalize_host_mappings_walker,
 		.flags	= KVM_PGTABLE_WALK_LEAF,
 	};
+	int i, ret;
 
-	return kvm_pgtable_walk(&pkvm_pgtable, 0, BIT(pkvm_pgtable.ia_bits), &walker);
+	for (i = 0; i < hyp_memblock_nr; i++) {
+		struct memblock_region *reg = &hyp_memory[i];
+		u64 start = (u64)hyp_phys_to_virt(reg->base);
+
+		ret = kvm_pgtable_walk(&pkvm_pgtable, start, reg->size, &walker);
+		if (ret)
+			return ret;
+	}
+
+	return 0;
 }
 
 static int select_iommu_ops(enum kvm_iommu_driver driver)
@@ -246,6 +256,15 @@ void __noreturn __pkvm_init_finalise(void)
 	if (ret)
 		goto out;
 
+	pkvm_pgtable_mm_ops = (struct kvm_pgtable_mm_ops) {
+		.zalloc_page = hyp_zalloc_hyp_page,
+		.phys_to_virt = hyp_phys_to_virt,
+		.virt_to_phys = hyp_virt_to_phys,
+		.get_page = hpool_get_page,
+		.put_page = hpool_put_page,
+	};
+	pkvm_pgtable.mm_ops = &pkvm_pgtable_mm_ops;
+
 	if (kvm_iommu_ops.init) {
 		ret = kvm_iommu_ops.init();
 		if (ret)
@@ -255,15 +274,6 @@ void __noreturn __pkvm_init_finalise(void)
 	ret = finalize_host_mappings();
 	if (ret)
 		goto out;
-
-	pkvm_pgtable_mm_ops = (struct kvm_pgtable_mm_ops) {
-		.zalloc_page = hyp_zalloc_hyp_page,
-		.phys_to_virt = hyp_phys_to_virt,
-		.virt_to_phys = hyp_virt_to_phys,
-		.get_page = hpool_get_page,
-		.put_page = hpool_put_page,
-	};
-	pkvm_pgtable.mm_ops = &pkvm_pgtable_mm_ops;
 
 out:
 	/*
