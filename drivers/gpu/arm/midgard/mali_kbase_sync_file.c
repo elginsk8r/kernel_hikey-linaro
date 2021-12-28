@@ -59,7 +59,7 @@ int kbase_sync_fence_stream_create(const char *name, int *const out_fd)
 	return 0;
 }
 
-int kbase_sync_fence_out_create(struct kbase_jd_atom *katom, int stream_fd)
+struct sync_file *kbase_sync_fence_out_create(struct kbase_jd_atom *katom, int stream_fd)
 {
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 10, 0))
 	struct fence *fence;
@@ -67,11 +67,10 @@ int kbase_sync_fence_out_create(struct kbase_jd_atom *katom, int stream_fd)
 	struct dma_fence *fence;
 #endif
 	struct sync_file *sync_file;
-	int fd;
 
 	fence = kbase_fence_out_new(katom);
 	if (!fence)
-		return -ENOMEM;
+		return NULL;
 
 #if (KERNEL_VERSION(4, 9, 67) >= LINUX_VERSION_CODE)
 	/* Take an extra reference to the fence on behalf of the sync_file.
@@ -87,19 +86,10 @@ int kbase_sync_fence_out_create(struct kbase_jd_atom *katom, int stream_fd)
 	if (!sync_file) {
 		dma_fence_put(fence);
 		kbase_fence_out_remove(katom);
-		return -ENOMEM;
+		return NULL;
 	}
 
-	fd = get_unused_fd_flags(O_CLOEXEC);
-	if (fd < 0) {
-		fput(sync_file->file);
-		kbase_fence_out_remove(katom);
-		return fd;
-	}
-
-	fd_install(fd, sync_file->file);
-
-	return fd;
+	return sync_file;
 }
 
 int kbase_sync_fence_in_from_fd(struct kbase_jd_atom *katom, int fd)
