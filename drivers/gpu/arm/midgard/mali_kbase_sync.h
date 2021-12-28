@@ -80,7 +80,7 @@ int kbase_sync_fence_stream_create(const char *name, int *const out_fd);
  *
  * return: Valid file descriptor to fence or < 0 on error
  */
-int kbase_sync_fence_out_create(struct kbase_jd_atom *katom, int stream_fd);
+struct sync_file *kbase_sync_fence_out_create(struct kbase_jd_atom *katom, int stream_fd);
 
 /**
  * kbase_sync_fence_in_from_fd() Assigns an existing fence to specified atom
@@ -155,21 +155,6 @@ void kbase_sync_fence_in_remove(struct kbase_jd_atom *katom);
  * This will also release the corresponding reference.
  */
 void kbase_sync_fence_out_remove(struct kbase_jd_atom *katom);
-
-/**
- * kbase_sync_fence_close_fd() - Close a file descriptor representing a fence
- * @fd: File descriptor to close
- */
-static inline void kbase_sync_fence_close_fd(int fd)
-{
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 11, 0)
-	close_fd(fd);
-#elif LINUX_VERSION_CODE >= KERNEL_VERSION(4, 17, 0)
-	ksys_close(fd);
-#else
-	sys_close(fd);
-#endif
-}
 
 /**
  * kbase_sync_fence_in_info_get() - Retrieves information about input fence
