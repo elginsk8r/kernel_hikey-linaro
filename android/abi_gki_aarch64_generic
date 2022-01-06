@@ -61,14 +61,17 @@
   __bitmap_andnot
   __bitmap_clear
   __bitmap_equal
+  bitmap_find_next_zero_area_off
   bitmap_from_arr32
   __bitmap_or
   bitmap_parse
   bitmap_parselist
   bitmap_print_to_pagebuf
+  __bitmap_set
   bitmap_to_arr32
   __bitmap_weight
   blk_alloc_queue
+  blk_check_plugged
   blk_cleanup_queue
   blk_crypto_init_key
   blkdev_get_by_dev
@@ -1083,6 +1086,7 @@
   __kfifo_init
   __kfifo_in_r
   __kfifo_out
+  __kfifo_out_peek
   __kfifo_skip_r
   __kfifo_to_user_r
   kfree
@@ -1105,6 +1109,7 @@
   kobject_add
   kobject_create_and_add
   kobject_del
+  kobject_get
   kobject_init
   kobject_init_and_add
   kobject_put
@@ -1151,6 +1156,7 @@
   ktime_get_raw_ts64
   ktime_get_real_seconds
   ktime_get_real_ts64
+  ktime_get_snapshot
   ktime_get_ts64
   ktime_get_with_offset
   kvfree
@@ -1253,6 +1259,7 @@
   netif_receive_skb_list
   netif_rx
   netif_rx_ni
+  netif_schedule_queue
   netif_tx_stop_all_queues
   netif_tx_wake_queue
   netlink_broadcast
@@ -1792,6 +1799,7 @@
   skb_dequeue
   skb_dequeue_tail
   skb_free_datagram
+  __skb_get_hash
   __skb_pad
   skb_pull
   skb_push
@@ -2076,6 +2084,7 @@
   __traceiter_android_vh_cma_alloc_start
   __traceiter_android_vh_cpu_idle_enter
   __traceiter_android_vh_cpu_idle_exit
+  __traceiter_android_vh_dup_task_struct
   __traceiter_android_vh_enable_thermal_genl_check
   __traceiter_android_vh_ep_create_wakeup_source
   __traceiter_android_vh_ipi_stop
@@ -2162,6 +2171,7 @@
   __tracepoint_android_vh_cma_alloc_start
   __tracepoint_android_vh_cpu_idle_enter
   __tracepoint_android_vh_cpu_idle_exit
+  __tracepoint_android_vh_dup_task_struct
   __tracepoint_android_vh_enable_thermal_genl_check
   __tracepoint_android_vh_ep_create_wakeup_source
   __tracepoint_android_vh_ipi_stop
