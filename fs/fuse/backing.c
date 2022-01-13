@@ -140,6 +140,8 @@ int fuse_open_backing(struct fuse_args *fa,
 	struct fuse_mount *fm = get_fuse_mount(inode);
 	const struct fuse_open_in *foi = fa->in_args[0].value;
 	struct fuse_file *ff;
+	int retval;
+	int mask;
 	struct fuse_dentry *fd = get_fuse_dentry(file->f_path.dentry);
 	struct file *backing_file;
 
@@ -148,9 +150,31 @@ int fuse_open_backing(struct fuse_args *fa,
 		return -ENOMEM;
 	file->private_data = ff;
 
+	switch (foi->flags & O_ACCMODE) {
+	case O_RDONLY:
+		mask = MAY_READ;
+		break;
+
+	case O_WRONLY:
+		mask = MAY_WRITE;
+		break;
+
+	case O_RDWR:
+		mask = MAY_READ | MAY_WRITE;
+		break;
+
+	default:
+		return -EINVAL;
+	}
+
+	retval = inode_permission(get_fuse_inode(inode)->backing_inode, mask);
+	if (retval)
+		return retval;
+
 	backing_file = dentry_open(&fd->backing_path,
 				   foi->flags,
 				   current_cred());
+
 	if (IS_ERR(backing_file)) {
 		fuse_file_free(ff);
 		file->private_data = NULL;
@@ -1002,6 +1026,29 @@ void *fuse_revalidate_finalize(struct fuse_args *fa, struct inode *dir,
 	return 0;
 }
 
+int fuse_canonical_path_initialize(struct fuse_args *fa,
+				   struct fuse_dummy_io *fdi,
+				   const struct path *path,
+				   struct path *canonical_path)
+{
+	fa->opcode = FUSE_CANONICAL_PATH;
+	return 0;
+}
+
+int fuse_canonical_path_backing(struct fuse_args *fa, const struct path *path,
+				struct path *canonical_path)
+{
+	get_fuse_backing_path(path->dentry, canonical_path);
+	return 0;
+}
+
+void *fuse_canonical_path_finalize(struct fuse_args *fa,
+				   const struct path *path,
+				   struct path *canonical_path)
+{
+	return NULL;
+}
+
 int fuse_mknod_initialize(
 		struct fuse_args *fa, struct fuse_mknod_in *fmi,
 		struct inode *dir, struct dentry *entry, umode_t mode, dev_t rdev)
@@ -1110,6 +1157,7 @@ int fuse_mkdir_backing(
 	struct inode *backing_inode = get_fuse_inode(dir)->backing_inode;
 	struct path backing_path = {};
 	struct inode *inode = NULL;
+	struct dentry *d;
 
 	//TODO Actually deal with changing the backing entry in mkdir
 	get_fuse_backing_path(entry, &backing_path);
@@ -1118,17 +1166,18 @@ int fuse_mkdir_backing(
 
 	inode_lock_nested(backing_inode, I_MUTEX_PARENT);
 	err = vfs_mkdir(backing_inode, backing_path.dentry, fmi->mode & ~fmi->umask);
-	inode_unlock(backing_inode);
 	if (err)
 		goto out;
 	if (d_really_is_negative(backing_path.dentry) ||
 		unlikely(d_unhashed(backing_path.dentry))) {
-		err = -EINVAL;
-		/**
-		 * TODO: overlayfs responds to this situation with a
-		 * lookupOneLen. Should we do that too?
-		 */
-		goto out;
+		d = lookup_one_len(entry->d_name.name, backing_path.dentry->d_parent,
+				entry->d_name.len);
+		if (IS_ERR(d)) {
+			err = PTR_ERR(d);
+			goto out;
+		}
+		dput(backing_path.dentry);
+		backing_path.dentry = d;
 	}
 	inode = fuse_iget_backing(dir->i_sb, backing_inode);
 	if (IS_ERR(inode)) {
@@ -1137,6 +1186,7 @@ int fuse_mkdir_backing(
 	}
 	d_instantiate(entry, inode);
 out:
+	inode_unlock(backing_inode);
 	path_put(&backing_path);
 	return err;
 }
