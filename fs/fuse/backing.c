@@ -1091,8 +1091,11 @@ int fuse_mknod_backing(
 		return -EBADF;
 
 	inode_lock_nested(backing_inode, I_MUTEX_PARENT);
+	mode = fmi->mode;
+	if (!IS_POSIXACL(backing_inode))
+		mode &= ~fmi->umask;
 	err = vfs_mknod(backing_inode, backing_path.dentry,
-			fmi->mode & ~fmi->umask, new_decode_dev(fmi->rdev));
+			mode, new_decode_dev(fmi->rdev));
 	inode_unlock(backing_inode);
 	if (err)
 		goto out;
@@ -1165,7 +1168,10 @@ int fuse_mkdir_backing(
 		return -EBADF;
 
 	inode_lock_nested(backing_inode, I_MUTEX_PARENT);
-	err = vfs_mkdir(backing_inode, backing_path.dentry, fmi->mode & ~fmi->umask);
+	mode = fmi->mode;
+	if (!IS_POSIXACL(backing_inode))
+		mode &= ~fmi->umask;
+	err = vfs_mkdir(backing_inode, backing_path.dentry, mode);
 	if (err)
 		goto out;
 	if (d_really_is_negative(backing_path.dentry) ||
@@ -1272,7 +1278,13 @@ static int fuse_rename_backing_common(
 		return -EBADF;
 	get_fuse_backing_path(newent, &new_backing_path);
 	if (!new_backing_path.dentry) {
-		err = -EBADF;
+		/*
+		 * TODO A file being moved from a backing path to another
+		 * backing path which is not yet instrumented with FUSE-BPF.
+		 * This may be slow and should be substituted with something
+		 * more clever.
+		 */
+		err = -EXDEV;
 		goto put_old_path;
 	}
 	if (new_backing_path.mnt != old_backing_path.mnt) {
@@ -1644,37 +1656,40 @@ void *fuse_getattr_finalize(struct fuse_args *fa,
 	return ERR_PTR(err);
 }
 
-static void fattr_to_iattr(const struct fuse_setattr_in *arg,
+static void fattr_to_iattr(struct fuse_conn *fc,
+			   const struct fuse_setattr_in *arg,
 			   struct iattr *iattr)
 {
-	unsigned int ivalid = arg->valid;
+	unsigned int fvalid = arg->valid;
 
-	if (ivalid & ATTR_MODE)
-		iattr->ia_valid |= FATTR_MODE, iattr->ia_mode = arg->mode;
-	if (ivalid & ATTR_UID) {
-		iattr->ia_valid |= FATTR_UID;
-		iattr->ia_uid = KUIDT_INIT(arg->uid);
+	if (fvalid & FATTR_MODE)
+		iattr->ia_valid |= ATTR_MODE, iattr->ia_mode = arg->mode;
+	if (fvalid & FATTR_UID) {
+		iattr->ia_valid |= ATTR_UID;
+		iattr->ia_uid = make_kuid(fc->user_ns, arg->uid);
 	}
-	if (ivalid & ATTR_GID) {
-		iattr->ia_valid |= FATTR_GID;
-		iattr->ia_gid = KGIDT_INIT(arg->gid);
+	if (fvalid & FATTR_GID) {
+		iattr->ia_valid |= ATTR_GID;
+		iattr->ia_gid = make_kgid(fc->user_ns, arg->gid);
 	}
-	if (ivalid & ATTR_SIZE)
-		iattr->ia_valid |= FATTR_SIZE,  iattr->ia_size = arg->size;
-	if (ivalid & ATTR_ATIME) {
-		iattr->ia_valid |= FATTR_ATIME;
+	if (fvalid & FATTR_SIZE)
+		iattr->ia_valid |= ATTR_SIZE,  iattr->ia_size = arg->size;
+	if (fvalid & FATTR_ATIME) {
+		iattr->ia_valid |= ATTR_ATIME;
 		iattr->ia_atime.tv_sec = arg->atime;
 		iattr->ia_atime.tv_nsec = arg->atimensec;
-		if (!(ivalid & ATTR_ATIME_SET))
-			iattr->ia_valid |= FATTR_ATIME_NOW;
+		if (!(fvalid & FATTR_ATIME_NOW))
+			iattr->ia_valid |= ATTR_ATIME_SET;
 	}
-	if (ivalid & ATTR_MTIME) {
-		iattr->ia_valid |= FATTR_MTIME;
+	if (fvalid & FATTR_MTIME) {
+		iattr->ia_valid |= ATTR_MTIME;
 		iattr->ia_mtime.tv_sec = arg->mtime;
 		iattr->ia_mtime.tv_nsec = arg->mtimensec;
+		if (!(fvalid & FATTR_MTIME_NOW))
+			iattr->ia_valid |= ATTR_MTIME_SET;
 	}
-	if (ivalid & ATTR_CTIME) {
-		iattr->ia_valid |= FATTR_CTIME;
+	if (fvalid & FATTR_CTIME) {
+		iattr->ia_valid |= ATTR_CTIME;
 		iattr->ia_ctime.tv_sec = arg->ctime;
 		iattr->ia_ctime.tv_nsec = arg->ctimensec;
 	}
@@ -1705,15 +1720,27 @@ int fuse_setattr_initialize(struct fuse_args *fa, struct fuse_setattr_io *fsio,
 int fuse_setattr_backing(struct fuse_args *fa,
 		struct dentry *dentry, struct iattr *attr, struct file *file)
 {
+	struct fuse_conn *fc = get_fuse_conn(dentry->d_inode);
 	const struct fuse_setattr_in *fsi = fa->in_args[0].value;
 	struct iattr new_attr = {0};
 	struct path *backing_path = &get_fuse_dentry(dentry)->backing_path;
 	int res;
 
-	fattr_to_iattr(fsi, &new_attr);
+	fattr_to_iattr(fc, fsi, &new_attr);
+	/* TODO: Some info doesn't get saved by the attr->fattr->attr transition
+	 * When we actually allow the bpf to change these, we may have to consider
+	 * the extra flags more, or pass more info into the bpf. Until then we can
+	 * keep everything except for ATTR_FILE, since we'd need a file on the
+	 * lower fs. For what it's worth, neither f2fs nor ext4 make use of that
+	 * even if it is present.
+	 */
+	new_attr.ia_valid = attr->ia_valid & ~ATTR_FILE;
 	inode_lock(d_inode(backing_path->dentry));
 	res = notify_change(backing_path->dentry, &new_attr, NULL);
 	inode_unlock(d_inode(backing_path->dentry));
+
+	if (res == 0 && (new_attr.ia_valid & ATTR_SIZE))
+		i_size_write(dentry->d_inode, new_attr.ia_size);
 	return res;
 }
 
