@@ -17,7 +17,7 @@
 #ifndef _UAPI__ASM_SIGCONTEXT_H
 #define _UAPI__ASM_SIGCONTEXT_H
 
-#ifdef CONFIG_64BIT
+#ifdef __aarch64__
 #ifndef __ASSEMBLY__
 
 #include <linux/types.h>
@@ -235,6 +235,6 @@ struct sve_context {
 
 #define SVE_SIG_CONTEXT_SIZE(vq) (SVE_SIG_REGS_OFFSET + SVE_SIG_REGS_SIZE(vq))
 
-#endif /* CONFIG_64BIT */
+#endif /* __aarch64__ */
 
 #endif /* _UAPI__ASM_SIGCONTEXT_H */
