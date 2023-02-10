@@ -30,7 +30,30 @@
  */
 
 #include "linux/mman.h"
+#include <linux/version.h>
 #include "../mali_kbase.h"
+
+#if KERNEL_VERSION(6, 1, 0) <= LINUX_VERSION_CODE
+/* This is defined inside kbase for matching the default to kernel's
+ * mmap_min_addr, used inside file mali_kbase_mmap.c.
+ * Note: the value is set at compile time, matching a kernel's configuration
+ * value. It would not be able to track any runtime update of mmap_min_addr.
+ */
+#ifdef CONFIG_MMU
+#define kbase_mmap_min_addr CONFIG_DEFAULT_MMAP_MIN_ADDR
+#ifdef CONFIG_LSM_MMAP_MIN_ADDR
+#if (CONFIG_LSM_MMAP_MIN_ADDR > CONFIG_DEFAULT_MMAP_MIN_ADDR)
+/* Replace the default definition with CONFIG_LSM_MMAP_MIN_ADDR */
+#undef kbase_mmap_min_addr
+#define kbase_mmap_min_addr CONFIG_LSM_MMAP_MIN_ADDR
+#endif /* (CONFIG_LSM_MMAP_MIN_ADDR > CONFIG_DEFAULT_MMAP_MIN_ADDR) */
+#endif /* CONFIG_LSM_MMAP_MIN_ADDR */
+#if (kbase_mmap_min_addr == CONFIG_DEFAULT_MMAP_MIN_ADDR)
+#endif
+#else /* CONFIG_MMU */
+#define kbase_mmap_min_addr (0UL)
+#endif /* CONFIG_MMU */
+#endif /* KERNEL_VERSION(6, 1, 0) <= LINUX_VERSION_CODE */
 
 /* mali_kbase_mmap.c
  *
@@ -152,6 +175,7 @@ static bool align_and_check(unsigned long *gap_end, unsigned long gap_start,
 static unsigned long kbase_unmapped_area_topdown(struct vm_unmapped_area_info
 		*info, bool is_shader_code, bool is_same_4gb_page)
 {
+#if (KERNEL_VERSION(6, 1, 0) > LINUX_VERSION_CODE)
 	struct mm_struct *mm = current->mm;
 	struct vm_area_struct *vma;
 	unsigned long length, low_limit, high_limit, gap_start, gap_end;
@@ -244,7 +268,37 @@ check_current:
 			}
 		}
 	}
+#else
+	unsigned long length, high_limit, gap_start, gap_end;
+ 
+	MA_STATE(mas, &current->mm->mm_mt, 0, 0);
+	/* Adjust search length to account for worst case alignment overhead */
+	length = info->length + info->align_mask;
+	if (length < info->length)
+		return -ENOMEM;
 
+	/*
+	 * Adjust search limits by the desired length.
+	 * See implementation comment at top of unmapped_area().
+	 */
+	gap_end = info->high_limit;
+	if (gap_end < length)
+		return -ENOMEM;
+	high_limit = gap_end - length;
+
+	if (info->low_limit > high_limit)
+		return -ENOMEM;
+
+	while (true) {
+		if (mas_empty_area_rev(&mas, info->low_limit, info->high_limit - 1, length))
+			return -ENOMEM;
+		gap_end = mas.last + 1;
+		gap_start = mas.min;
+
+		if (align_and_check(&gap_end, gap_start, info, is_shader_code, is_same_4gb_page))
+			return gap_end;
+	}
+#endif
 	return -ENOMEM;
 }
 
@@ -262,14 +316,26 @@ unsigned long kbase_get_unmapped_area(struct file *filp,
 	struct vm_unmapped_area_info info;
 	unsigned long align_offset = 0;
 	unsigned long align_mask = 0;
+#if (KERNEL_VERSION(6, 1, 0) <= LINUX_VERSION_CODE)
+	unsigned long high_limit = arch_get_mmap_base(addr, mm->mmap_base);
+	unsigned long low_limit = max_t(unsigned long, PAGE_SIZE, kbase_mmap_min_addr);
+#else
 	unsigned long high_limit = mm->mmap_base;
 	unsigned long low_limit = PAGE_SIZE;
+#endif
 	int cpu_va_bits = BITS_PER_LONG;
 	int gpu_pc_bits =
 	      kctx->kbdev->gpu_props.props.core_props.log2_program_counter_size;
 	bool is_shader_code = false;
 	bool is_same_4gb_page = false;
 	unsigned long ret;
+#if (KERNEL_VERSION(6, 1, 0) <= LINUX_VERSION_CODE)
+	const unsigned long mmap_end = arch_get_mmap_end(addr, len, flags);
+
+	/* requested length too big for entire address space */
+	if (len > mmap_end - kbase_mmap_min_addr)
+		return -ENOMEM;
+#endif
 
 	/* err on fixed address */
 	if ((flags & MAP_FIXED) || addr)
@@ -282,7 +348,7 @@ unsigned long kbase_get_unmapped_area(struct file *filp,
 
 	if (!kbase_ctx_flag(kctx, KCTX_COMPAT)) {
 
-		high_limit = min_t(unsigned long, mm->mmap_base,
+		high_limit = min_t(unsigned long, high_limit,
 				(kctx->same_va_end << PAGE_SHIFT));
 
 		/* If there's enough (> 33 bits) of GPU VA space, align
@@ -350,10 +416,17 @@ unsigned long kbase_get_unmapped_area(struct file *filp,
 
 	if (IS_ERR_VALUE(ret) && high_limit == mm->mmap_base &&
 			high_limit < (kctx->same_va_end << PAGE_SHIFT)) {
+#if (KERNEL_VERSION(6, 1, 0) <= LINUX_VERSION_CODE)
+		/* Retry above TASK_UNMAPPED_BASE */
+		info.low_limit = TASK_UNMAPPED_BASE;
+		info.high_limit = min_t(u64, mmap_end,
+					(kctx->same_va_end << PAGE_SHIFT));
+#else
 		/* Retry above mmap_base */
 		info.low_limit = mm->mmap_base;
 		info.high_limit = min_t(u64, TASK_SIZE,
 					(kctx->same_va_end << PAGE_SHIFT));
+#endif
 
 		ret = kbase_unmapped_area_topdown(&info, is_shader_code,
 				is_same_4gb_page);
