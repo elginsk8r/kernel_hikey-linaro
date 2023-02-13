@@ -345,6 +345,10 @@ static void dhd_hang_process(void *dhd_info, void *event_data, u8 event);
 MODULE_LICENSE("GPL and additional rights");
 #endif /* LinuxVer */
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0))
+MODULE_IMPORT_NS(VFS_internal_I_am_really_a_filesystem_and_am_NOT_a_driver);
+#endif /* LinuxVer */
+
 #if defined(MULTIPLE_SUPPLICANT)
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 25))
 DEFINE_MUTEX(_dhd_mutex_lock_);
