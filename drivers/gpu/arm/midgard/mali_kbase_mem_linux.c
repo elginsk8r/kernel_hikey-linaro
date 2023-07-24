@@ -1110,10 +1110,14 @@ static struct kbase_va_region *kbase_mem_from_user_buffer(
 #elif LINUX_VERSION_CODE < KERNEL_VERSION(4, 9, 0)
 	faulted_pages = get_user_pages(address, *va_pages,
 			reg->flags & KBASE_REG_GPU_WR, 0, pages, NULL);
-#else
+#elif LINUX_VERSION_CODE < KERNEL_VERSION(6, 4, 0)
 	faulted_pages = get_user_pages(address, *va_pages,
 			reg->flags & KBASE_REG_GPU_WR ? FOLL_WRITE : 0,
 			pages, NULL);
+#else
+	faulted_pages = get_user_pages(address, *va_pages,
+			reg->flags & KBASE_REG_GPU_WR ? FOLL_WRITE : 0,
+			pages);
 #endif
 
 	mmap_read_unlock(current->mm);
