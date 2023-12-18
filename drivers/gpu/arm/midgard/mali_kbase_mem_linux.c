@@ -527,7 +527,7 @@ unsigned long kbase_mem_evictable_reclaim_count_objects(struct shrinker *s,
 	struct kbase_mem_phy_alloc *alloc;
 	unsigned long pages = 0;
 
-	kctx = container_of(s, struct kbase_context, reclaim);
+	kctx = s->private_data;
 
 	mutex_lock(&kctx->jit_evict_lock);
 
@@ -566,7 +566,7 @@ unsigned long kbase_mem_evictable_reclaim_scan_objects(struct shrinker *s,
 	struct kbase_mem_phy_alloc *tmp;
 	unsigned long freed = 0;
 
-	kctx = container_of(s, struct kbase_context, reclaim);
+	kctx = s->private_data;
 	mutex_lock(&kctx->jit_evict_lock);
 
 	list_for_each_entry_safe(alloc, tmp, &kctx->evict_list, evict_node) {
@@ -628,25 +628,30 @@ int kbase_mem_evictable_init(struct kbase_context *kctx)
 	mutex_init(&kctx->jit_evict_lock);
 
 	/* Register shrinker */
+	kctx->reclaim = shrinker_alloc(0, "arm-mali-midgard");
 #if LINUX_VERSION_CODE < KERNEL_VERSION(3, 12, 0)
-	kctx->reclaim.shrink = kbase_mem_evictable_reclaim_shrink;
+	kctx->reclaim->shrink = kbase_mem_evictable_reclaim_shrink;
 #else
-	kctx->reclaim.count_objects = kbase_mem_evictable_reclaim_count_objects;
-	kctx->reclaim.scan_objects = kbase_mem_evictable_reclaim_scan_objects;
+	kctx->reclaim->count_objects = kbase_mem_evictable_reclaim_count_objects;
+	kctx->reclaim->scan_objects = kbase_mem_evictable_reclaim_scan_objects;
 #endif
-	kctx->reclaim.seeks = DEFAULT_SEEKS;
+	kctx->reclaim->private_data = kctx;
 	/* Kernel versions prior to 3.1 :
 	 * struct shrinker does not define batch */
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 1, 0)
-	kctx->reclaim.batch = 0;
+	kctx->reclaim->batch = 0;
 #endif
-	register_shrinker(&kctx->reclaim, "arm-mali-midgard");
+
+	shrinker_register(kctx->reclaim);
+
 	return 0;
 }
 
 void kbase_mem_evictable_deinit(struct kbase_context *kctx)
 {
-	unregister_shrinker(&kctx->reclaim);
+	if (kctx->reclaim) {
+		shrinker_free(kctx->reclaim);
+	}
 }
 
 /**
