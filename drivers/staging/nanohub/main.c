@@ -1777,7 +1777,7 @@ static int __init nanohub_init(void)
 {
 	int ret = 0;
 
-	sensor_class = class_create(THIS_MODULE, "nanohub");
+	sensor_class = class_create("nanohub");
 	if (IS_ERR(sensor_class)) {
 		ret = PTR_ERR(sensor_class);
 		pr_err("nanohub: class_create failed; err=%d\n", ret);
