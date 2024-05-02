@@ -3587,7 +3587,7 @@ err_teardown_orig_pages:
 	kbase_mmu_teardown_pages(kctx->kbdev, &kctx->mmu, reg->start_pfn,
 			count, kctx->as_nr);
 err_unmap_attachment:
-	dma_buf_unmap_attachment(alloc->imported.umm.dma_attachment,
+	dma_buf_unmap_attachment_unlocked(alloc->imported.umm.dma_attachment,
 			alloc->imported.umm.sgt, DMA_BIDIRECTIONAL);
 	alloc->imported.umm.sgt = NULL;
 
@@ -3601,7 +3601,7 @@ static void kbase_jd_umm_unmap(struct kbase_context *kctx,
 	KBASE_DEBUG_ASSERT(alloc);
 	KBASE_DEBUG_ASSERT(alloc->imported.umm.dma_attachment);
 	KBASE_DEBUG_ASSERT(alloc->imported.umm.sgt);
-	dma_buf_unmap_attachment(alloc->imported.umm.dma_attachment,
+	dma_buf_unmap_attachment_unlocked(alloc->imported.umm.dma_attachment,
 	    alloc->imported.umm.sgt, DMA_BIDIRECTIONAL);
 	alloc->imported.umm.sgt = NULL;
 	alloc->nents = 0;
