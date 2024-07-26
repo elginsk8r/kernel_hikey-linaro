@@ -53,13 +53,13 @@ else
 DEFINES +=-DMALI_KBASE_PLATFORM_PATH=$(src)/platform/$(CONFIG_MALI_PLATFORM_NAME)
 endif
 
-DEFINES += -I$(srctree)/drivers/staging/android
+DEFINES += -Idrivers/staging/android
 
 DEFINES += -DMALI_KBASE_BUILD
 
 # Use our defines when compiling
-ccflags-y += $(DEFINES) -I$(KBASE_PATH)   -I$(KBASE_PLATFORM_PATH) -I$(UMP_PATH) -I$(srctree)/include/linux
-subdir-ccflags-y += $(DEFINES) -I$(KBASE_PATH)   -I$(KBASE_PLATFORM_PATH) -I$(UMP_PATH) -I$(srctree)/include/linux
+ccflags-y += $(DEFINES) -I$(KBASE_PATH)   -I$(KBASE_PLATFORM_PATH) -I$(UMP_PATH) -Iinclude/linux
+subdir-ccflags-y += $(DEFINES) -I$(KBASE_PATH)   -I$(KBASE_PLATFORM_PATH) -I$(UMP_PATH) -Iinclude/linux
 
 SRC := \
 	mali_kbase_device.c \
@@ -133,7 +133,7 @@ mali_kbase-y := $(SRC:.c=.o)
 # Kconfig passes in the name with quotes for in-tree builds - remove them.
 platform_name := $(shell echo $(CONFIG_MALI_PLATFORM_NAME))
 MALI_PLATFORM_DIR := platform/$(platform_name)
-ccflags-y += -I$(srctree)/$(src)/$(MALI_PLATFORM_DIR)
+ccflags-y += -I$(src)/$(MALI_PLATFORM_DIR)
 include $(src)/$(MALI_PLATFORM_DIR)/Kbuild
 
 ifeq ($(CONFIG_MALI_DEVFREQ),y)
@@ -161,9 +161,9 @@ include  $(src)/backend/gpu/Kbuild
 mali_kbase-y += $(BACKEND:.c=.o)
 
 
-ccflags-y += -I$(srctree)/$(src)/backend/gpu
+ccflags-y += -I$(src)/backend/gpu
 ccflags-y += $(call cc-disable-warning, implicit-fallthrough)
-subdir-ccflags-y += -I$(srctree)/$(src)/backend/gpu
+subdir-ccflags-y += -I$(src)/backend/gpu
 
 # For kutf and mali_kutf_irq_latency_test
 obj-$(CONFIG_MALI_KUTF) += tests/
