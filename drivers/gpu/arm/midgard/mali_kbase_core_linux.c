@@ -427,6 +427,9 @@ static int kbase_open(struct inode *inode, struct file *filp)
 	char kctx_name[64];
 #endif
 
+	if (WARN_ON_ONCE(!(filp->f_op->fop_flags & FOP_UNSIGNED_OFFSET)))
+		return -EINVAL;
+
 	kbdev = kbase_find_device(iminor(inode));
 
 	if (!kbdev)
@@ -444,7 +447,6 @@ static int kbase_open(struct inode *inode, struct file *filp)
 
 	init_waitqueue_head(&kctx->event_queue);
 	filp->private_data = kctx;
-	filp->f_mode |= FMODE_UNSIGNED_OFFSET;
 	kctx->filp = filp;
 
 	if (kbdev->infinite_cache_active_default)
@@ -1445,6 +1447,7 @@ static int kbase_check_flags(int flags)
 
 static const struct file_operations kbase_fops = {
 	.owner = THIS_MODULE,
+	.fop_flags = FOP_UNSIGNED_OFFSET,
 	.open = kbase_open,
 	.release = kbase_release,
 	.read = kbase_read,
