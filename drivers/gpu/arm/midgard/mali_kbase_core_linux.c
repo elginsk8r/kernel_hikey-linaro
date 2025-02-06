@@ -217,7 +217,11 @@ static int assign_irqs(struct platform_device *pdev)
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5,18,0))
 		int irq;
+#if KERNEL_VERSION(5, 4, 0) <= LINUX_VERSION_CODE
+		irq = platform_get_irq_byname_optional(pdev, irq_names[i]);
+#else
 		irq = platform_get_irq_byname(pdev, irq_names[i]);
+#endif
 		if (irq <= 0) {
 			dev_err(kbdev->dev, "No IRQ defined as %s\n", irq_names[i]);
 			return -ENOENT;
