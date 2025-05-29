@@ -394,10 +394,15 @@ int kbase_devfreq_init(struct kbase_device *kbdev)
 		goto cooling_failed;
 	}
 
+#if KERNEL_VERSION(5, 11, 0) <= LINUX_VERSION_CODE
+	kbdev->devfreq_cooling = devfreq_cooling_em_register(
+			kbdev->devfreq, &kbase_ipa_power_model_ops);
+#else
 	kbdev->devfreq_cooling = of_devfreq_cooling_register_power(
 			kbdev->dev->of_node,
 			kbdev->devfreq,
 			&kbase_ipa_power_model_ops);
+#endif
 	if (IS_ERR_OR_NULL(kbdev->devfreq_cooling)) {
 		err = PTR_ERR(kbdev->devfreq_cooling);
 		dev_err(kbdev->dev,
