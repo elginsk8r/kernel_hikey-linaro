@@ -663,8 +663,8 @@ static size_t kbasep_tlstream_write_string(
 	KBASE_DEBUG_ASSERT(max_write_size >= sizeof(string_len) + sizeof(char));
 	max_write_size -= sizeof(string_len);
 
-	string_len = strlcpy(
-			&buffer[pos + sizeof(string_len)],
+	string_len = strlen(string);
+	strscpy(&buffer[pos + sizeof(string_len)],
 			string,
 			max_write_size);
 	string_len += sizeof(char);
