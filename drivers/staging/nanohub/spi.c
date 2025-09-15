@@ -168,7 +168,7 @@ static int spi_bl_open(const void *data)
 	const struct nanohub_spi_data *spi_data = data;
 	int ret;
 
-	spi_bus_lock(spi_data->device->master);
+	spi_bus_lock(spi_data->device->controller);
 	spi_data->device->max_speed_hz = spi_data->data.pdata->bl_max_speed_hz;
 	spi_data->device->mode = spi_data->data.pdata->spi_mode;
 	spi_data->device->bits_per_word = 8;
@@ -184,7 +184,7 @@ static void spi_bl_close(const void *data)
 	const struct nanohub_spi_data *spi_data = data;
 
 	gpio_set_value(spi_data->cs, 1);
-	spi_bus_unlock(spi_data->device->master);
+	spi_bus_unlock(spi_data->device->controller);
 }
 
 static uint8_t spi_bl_sync(const void *data)
@@ -374,7 +374,7 @@ static int nanohub_spi_open(void *data)
 	int ret;
 
 	down(&spi_data->spi_sem);
-	spi_bus_lock(spi_data->device->master);
+	spi_bus_lock(spi_data->device->controller);
 	spi_data->device->max_speed_hz = spi_data->data.max_speed_hz;
 	spi_data->device->mode = spi_data->data.pdata->spi_mode;
 	spi_data->device->bits_per_word = 8;
@@ -392,7 +392,7 @@ static void nanohub_spi_close(void *data)
 	struct nanohub_spi_data *spi_data = data;
 
 	gpio_set_value(spi_data->cs, 1);
-	spi_bus_unlock(spi_data->device->master);
+	spi_bus_unlock(spi_data->device->controller);
 	up(&spi_data->spi_sem);
 	udelay(60);
 }

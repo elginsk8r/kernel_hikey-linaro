@@ -102,8 +102,8 @@ static const struct gpio_config gconf[] = {
 	{ PLAT_GPIO_DEF(nreset, GPIOF_OUT_INIT_HIGH) },
 	{ PLAT_GPIO_DEF(wakeup, GPIOF_OUT_INIT_HIGH) },
 	{ PLAT_GPIO_DEF(boot0, GPIOF_OUT_INIT_LOW) },
-	{ PLAT_GPIO_DEF_IRQ(irq1, GPIOF_DIR_IN, 0) },
-	{ PLAT_GPIO_DEF_IRQ(irq2, GPIOF_DIR_IN, GPIO_OPT_OPTIONAL) },
+	{ PLAT_GPIO_DEF_IRQ(irq1, GPIOF_IN, 0) },
+	{ PLAT_GPIO_DEF_IRQ(irq2, GPIOF_IN, GPIO_OPT_OPTIONAL) },
 };
 
 static const struct iio_info nanohub_iio_info = {
@@ -1362,7 +1362,6 @@ static struct nanohub_platform_data *nanohub_parse_dt(struct device *dev)
 	struct nanohub_platform_data *pdata;
 	struct device_node *dt = dev->of_node;
 	const uint32_t *tmp;
-	struct property *prop;
 	uint32_t u, i;
 	int ret;
 
@@ -1433,8 +1432,7 @@ static struct nanohub_platform_data *nanohub_parse_dt(struct device *dev)
 		/* TODO: investigate replacing with of_property_read_u32_array
 		 */
 		i = 0;
-		of_property_for_each_u32(dt, "sensorhub,flash-banks", prop, tmp,
-					 u) {
+		of_property_for_each_u32(dt, "sensorhub,flash-banks", u) {
 			if (i / 3 >= pdata->num_flash_banks)
 				break;
 			switch (i % 3) {
@@ -1466,8 +1464,7 @@ static struct nanohub_platform_data *nanohub_parse_dt(struct device *dev)
 		/* TODO: investigate replacing with of_property_read_u32_array
 		 */
 		i = 0;
-		of_property_for_each_u32(dt, "sensorhub,shared-flash-banks",
-					 prop, tmp, u) {
+		of_property_for_each_u32(dt, "sensorhub,shared-flash-banks", u) {
 			if (i / 3 >= pdata->num_shared_flash_banks)
 				break;
 			switch (i % 3) {
